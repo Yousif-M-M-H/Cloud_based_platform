@@ -9,7 +9,7 @@ import axios from 'axios';
 Mapbox.setAccessToken('pk.eyJ1IjoieW9zaWZtb2hhbWVkYWluIiwiYSI6ImNtODNsNzAwMDA2YjMyanBuamhxYzNucTYifQ.KoWrvWMmp4ZhrOXkVN640Q');
 
 // API URL
-const API_URL = 'http://localhost:5000/locations'; // Change to your backend server address
+const API_URL = 'http://10.0.2.2:5000/locations'; // ✅ Use this for Android emulator
 
 // ✅ Define TypeScript Interface for Location Data
 interface LocationData {
