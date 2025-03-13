@@ -1,63 +1,98 @@
 import 'expo-dev-client';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Alert } from 'react-native';
+import { StyleSheet, View, Alert, ActivityIndicator } from 'react-native';
 import * as Location from 'expo-location';
 import Mapbox from '@rnmapbox/maps';
+import axios from 'axios';
 
 // Set Mapbox access token
 Mapbox.setAccessToken('pk.eyJ1IjoieW9zaWZtb2hhbWVkYWluIiwiYSI6ImNtODNsNzAwMDA2YjMyanBuamhxYzNucTYifQ.KoWrvWMmp4ZhrOXkVN640Q');
 
+// API URL
+const API_URL = 'http://localhost:5000/locations'; // Change to your backend server address
+
+// ✅ Define TypeScript Interface for Location Data
+interface LocationData {
+  latitude: number;
+  longitude: number;
+}
+
+// ✅ Fix: Explicitly Define useState Types
 const App = () => {
   const [location, setLocation] = useState<number[] | null>(null);
-  const [error, setError] = useState(false);
+  const [savedLocations, setSavedLocations] = useState<LocationData[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Function to get current location
+  // ✅ Fetch Current Location
   const fetchLocation = async () => {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Allow location access to use the map');
-        setError(true);
         return;
       }
 
       let currentLocation = await Location.getCurrentPositionAsync({});
-      setLocation([currentLocation.coords.longitude, currentLocation.coords.latitude]);
+      const coords: number[] = [currentLocation.coords.longitude, currentLocation.coords.latitude];
+      setLocation(coords);
+
+      // ✅ Store location in MongoDB
+      await axios.post(API_URL, {
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude
+      });
+
+      console.log('📍 Location saved:', coords);
     } catch (error) {
       console.error('Error getting location:', error);
       Alert.alert('Error', 'Unable to fetch location');
-      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Fetch Saved Locations from MongoDB
+  const fetchSavedLocations = async () => {
+    try {
+      const response = await axios.get<LocationData[]>(API_URL); // ✅ Define Response Type
+      setSavedLocations(response.data);
+      console.log('📍 Fetched locations:', response.data);
+    } catch (error) {
+      console.error('Error fetching saved locations:', error);
     }
   };
 
   useEffect(() => {
     fetchLocation();
+    fetchSavedLocations();
   }, []);
 
-  // Do not render anything until location is available
-  if (!location && !error) {
-    return null; // No UI until location is fetched
-  }
-
-  // If error occurs, show an alert and exit
-  if (error) {
-    Alert.alert('Error', 'Failed to get location. Restart the app.');
-    return null;
+  if (loading) {
+    return <ActivityIndicator size="large" color="#0000ff" />;
   }
 
   return (
     <View style={styles.container}>
       <Mapbox.MapView style={styles.map}>
-        {location && (
-          <>
-            <Mapbox.Camera zoomLevel={12} centerCoordinate={location} />
+        {location && <Mapbox.Camera zoomLevel={12} centerCoordinate={location} />}
 
-            {/* Marker for current location */}
-            <Mapbox.PointAnnotation id="currentLocation" coordinate={location}>
-              <View style={styles.marker} />
-            </Mapbox.PointAnnotation>
-          </>
+        {/* Display current location marker */}
+        {location && (
+          <Mapbox.PointAnnotation id="currentLocation" coordinate={location}>
+            <View style={styles.marker} />
+          </Mapbox.PointAnnotation>
         )}
+
+        {/* ✅ Fix: Convert key to string to avoid TypeScript error */}
+        {savedLocations.map((loc, index) => (
+          <Mapbox.PointAnnotation
+            key={`saved-${index}`} // ✅ Convert index to string
+            id={`savedLocation-${index}`} // ✅ ID should be a string
+            coordinate={[loc.longitude, loc.latitude]} // ✅ Ensure coordinates are numbers
+          >
+            <View style={styles.savedMarker} />
+          </Mapbox.PointAnnotation>
+        ))}
       </Mapbox.MapView>
     </View>
   );
@@ -78,6 +113,14 @@ const styles = StyleSheet.create({
     width: 20,
     backgroundColor: 'blue',
     borderColor: 'white',
+    borderWidth: 2,
+    borderRadius: 50,
+  },
+  savedMarker: {
+    height: 15,
+    width: 15,
+    backgroundColor: 'red',
+    borderColor: 'black',
     borderWidth: 2,
     borderRadius: 50,
   },
